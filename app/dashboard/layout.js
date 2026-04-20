@@ -12,6 +12,7 @@ export default async function DashboardLayout({ children }) {
     { href: '/ingest', label: 'Ingest Budget', icon: '⊕' },
     { href: '/dashboard/budgets', label: 'My Budgets', icon: '☰' },
     { href: '/dashboard/analytics', label: 'Analytics', icon: '◈' },
+    { href: '/dashboard/compare', label: 'Compare Counties', icon: '⇄' },
   ]
 
   return (
