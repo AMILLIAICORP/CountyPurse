@@ -9,6 +9,7 @@ export default async function CountyPage({ params: paramsPromise }) {
   )
 
   const params = await paramsPromise
+
   const { data: county } = await supabase
     .from('public_budgets')
     .select('*')
@@ -19,7 +20,17 @@ export default async function CountyPage({ params: paramsPromise }) {
 
   const parsed = county.parsed_data || {}
   const departments = parsed.departments || []
-  const totalAmount = county.total_amount || parsed.totalAmount
+  const totalAmount = county.total_amount || parsed.totalAmount || parsed.totalExpenditure
+  const population = parsed.population
+  const totalRevenue = parsed.totalRevenue
+
+  function fmt(n) {
+    if (!n) return 'N/A'
+    if (n >= 1000000000) return '$' + (n / 1000000000).toFixed(1) + 'B'
+    if (n >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M'
+    if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'K'
+    return '$' + n.toLocaleString()
+  }
 
   return (
     <div style={{minHeight:'100vh',background:'#f8f6f1'}}>
@@ -50,20 +61,22 @@ export default async function CountyPage({ params: paramsPromise }) {
           </p>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'16px',marginBottom:'40px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'16px',marginBottom:'40px'}}>
           <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:'12px',padding:'20px'}}>
             <p style={{fontSize:'11px',color:'#9ca3af',fontFamily:'monospace',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'8px'}}>Total Budget</p>
-            <p style={{fontFamily:'Georgia,serif',fontSize:'24px',color:'#1a1a2e'}}>
-              {totalAmount ? '$' + (totalAmount / 1000000).toFixed(1) + 'M' : 'N/A'}
-            </p>
+            <p style={{fontFamily:'Georgia,serif',fontSize:'22px',color:'#1a1a2e'}}>{fmt(totalAmount)}</p>
           </div>
           <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:'12px',padding:'20px'}}>
-            <p style={{fontSize:'11px',color:'#9ca3af',fontFamily:'monospace',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'8px'}}>Fiscal Year</p>
-            <p style={{fontFamily:'Georgia,serif',fontSize:'24px',color:'#1a1a2e'}}>{parsed.fiscalYear || 'N/A'}</p>
+            <p style={{fontSize:'11px',color:'#9ca3af',fontFamily:'monospace',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'8px'}}>Total Revenue</p>
+            <p style={{fontFamily:'Georgia,serif',fontSize:'22px',color:'#1a1a2e'}}>{fmt(totalRevenue)}</p>
+          </div>
+          <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:'12px',padding:'20px'}}>
+            <p style={{fontSize:'11px',color:'#9ca3af',fontFamily:'monospace',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'8px'}}>Population</p>
+            <p style={{fontFamily:'Georgia,serif',fontSize:'22px',color:'#1a1a2e'}}>{population ? population.toLocaleString() : 'N/A'}</p>
           </div>
           <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:'12px',padding:'20px'}}>
             <p style={{fontSize:'11px',color:'#9ca3af',fontFamily:'monospace',letterSpacing:'2px',textTransform:'uppercase',marginBottom:'8px'}}>Departments</p>
-            <p style={{fontFamily:'Georgia,serif',fontSize:'24px',color:'#1a1a2e'}}>{departments.length || 'N/A'}</p>
+            <p style={{fontFamily:'Georgia,serif',fontSize:'22px',color:'#1a1a2e'}}>{departments.length || 'N/A'}</p>
           </div>
         </div>
 
@@ -79,14 +92,19 @@ export default async function CountyPage({ params: paramsPromise }) {
             <h2 style={{fontFamily:'Georgia,serif',fontSize:'20px',color:'#1a1a2e',marginBottom:'20px'}}>Department Breakdown</h2>
             <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
               {departments.map((dept, i) => (
-                <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px',background:'#f8f6f1',borderRadius:'8px'}}>
-                  <div>
+                <div key={i}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}}>
                     <p style={{fontWeight:'600',color:'#1a1a2e',fontSize:'14px'}}>{dept.name}</p>
-                    {dept.percentOfTotal && <p style={{fontSize:'12px',color:'#9ca3af',marginTop:'2px'}}>{dept.percentOfTotal}% of total budget</p>}
+                    <p style={{fontFamily:'monospace',fontWeight:'700',color:'#2e7d5e',fontSize:'14px'}}>
+                      {dept.amount ? fmt(dept.amount) : 'N/A'}
+                    </p>
                   </div>
-                  <p style={{fontFamily:'monospace',fontWeight:'700',color:'#2e7d5e',fontSize:'14px'}}>
-                    {dept.amount ? '$' + Number(dept.amount).toLocaleString() : 'N/A'}
-                  </p>
+                  {dept.percentOfTotal && (
+                    <div style={{background:'#e5e7eb',borderRadius:'999px',height:'6px',overflow:'hidden'}}>
+                      <div style={{background:'#2e7d5e',height:'100%',width:Math.min(parseFloat(dept.percentOfTotal),100)+'%',borderRadius:'999px'}}></div>
+                    </div>
+                  )}
+                  {dept.percentOfTotal && <p style={{fontSize:'11px',color:'#9ca3af',marginTop:'4px'}}>{dept.percentOfTotal}% of total budget</p>}
                 </div>
               ))}
             </div>
@@ -106,12 +124,22 @@ export default async function CountyPage({ params: paramsPromise }) {
           </div>
         )}
 
-        {county.source_url && (
-          <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:'12px',padding:'24px',marginBottom:'24px'}}>
-            <h2 style={{fontFamily:'Georgia,serif',fontSize:'20px',color:'#1a1a2e',marginBottom:'12px'}}>Source</h2>
-            <a href={county.source_url} target="_blank" rel="noopener noreferrer" style={{color:'#2e7d5e',fontSize:'14px',wordBreak:'break-all'}}>{county.source_url}</a>
+        <div style={{background:'white',border:'1px solid #e5e7eb',borderRadius:'12px',padding:'24px',marginBottom:'24px'}}>
+          <h2 style={{fontFamily:'Georgia,serif',fontSize:'20px',color:'#1a1a2e',marginBottom:'12px'}}>Data Sources</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+            <div style={{display:'flex',gap:'10px',fontSize:'14px',color:'#4b5563'}}>
+              <span>📊</span><span>US Census Bureau Annual Survey of Government Finances (2021)</span>
+            </div>
+            <div style={{display:'flex',gap:'10px',fontSize:'14px',color:'#4b5563'}}>
+              <span>👥</span><span>US Census Bureau American Community Survey 5-Year Estimates (2022)</span>
+            </div>
+            {county.source_url && (
+              <div style={{display:'flex',gap:'10px',fontSize:'14px',color:'#4b5563'}}>
+                <span>🌐</span><a href={county.source_url} target="_blank" rel="noopener noreferrer" style={{color:'#2e7d5e',wordBreak:'break-all'}}>{county.source_url}</a>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         <div style={{padding:'32px',background:'#1a1a2e',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:'32px'}}>
           <div>
@@ -124,7 +152,7 @@ export default async function CountyPage({ params: paramsPromise }) {
         </div>
 
         <p style={{textAlign:'center',marginTop:'32px',fontSize:'12px',color:'#9ca3af'}}>
-          Data sourced from official government websites · Parsed by AMILLI AI, CORP · © {new Date().getFullYear()}
+          Powered by <strong style={{color:'#1a1a2e'}}>AMILLI AI, CORP</strong> · Data: US Census Bureau · © {new Date().getFullYear()}
         </p>
       </div>
     </div>
